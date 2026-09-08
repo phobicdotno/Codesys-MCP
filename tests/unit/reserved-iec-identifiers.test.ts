@@ -48,8 +48,26 @@ describe('findReservedIecIdentifiers', () => {
     ].join('\n'))).toHaveLength(0);
   });
 
-  it('does not flag standard-function names (MIN/MAX/ABS not confirmed reserved)', () => {
-    expect(findReservedIecIdentifiers('VAR\n    min : INT;\n    abs : INT;\nEND_VAR')).toHaveLength(0);
+  it('flags CODESYS compiler operator names in any casing (sIn/SIN gap, 2026-09-07)', () => {
+    for (const name of ['sIn', 'SIN', 'sin', 'diV', 'DIV', 'min', 'Max', 'abs', 'sel', 'Limit', 'trunc', 'shl']) {
+      const warnings = findReservedIecIdentifiers(`VAR
+    ${name} : INT;
+END_VAR`);
+      expect(warnings, name).toHaveLength(1);
+      expect(warnings[0]).toContain('operator');
+    }
+  });
+
+  it('does not flag library-function names (LEN/MID shadow, not compiler tokens)', () => {
+    expect(findReservedIecIdentifiers(`VAR
+    len : INT;
+    mid : INT;
+END_VAR`)).toHaveLength(0);
+    // names merely containing an operator are fine
+    expect(findReservedIecIdentifiers(`VAR
+    sInput : STRING;
+    diValue : DINT;
+END_VAR`)).toHaveLength(0);
   });
 
   it('handles AT %address declarations', () => {

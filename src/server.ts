@@ -899,10 +899,10 @@ const RESERVED_IEC_IDENTIFIERS = new Set([
  * step keyword). Found the hard way 2026-07-16: `by : BYTE;` fails to compile.
  *
  * Sources: IEC 61131-3 (3rd ed.) keyword tables; CODESYS export-format keyword
- * list (content.helpme-codesys.com _cds_keywords.html). Deliberately EXCLUDES
- * standard-function names (MIN, MAX, ABS, ADD, MUL, SEL, ...) -- those are
- * not confirmed to be rejected as variable names, and a false positive here
- * blocks a legitimate call. Extend only with words the compiler provably
+ * list (content.helpme-codesys.com _cds_keywords.html). Compiler OPERATOR
+ * names (SIN, DIV, MIN, MAX, ...) live in CODESYS_OPERATOR_KEYWORDS below;
+ * they were excluded here until 2026-09-07, when 'sIn' and 'diV' proved the
+ * compiler rejects them too. Extend only with words the compiler provably
  * refuses.
  */
 const RESERVED_IEC_KEYWORDS = new Set([
@@ -947,6 +947,26 @@ const RESERVED_IEC_KEYWORDS = new Set([
 ]);
 
 /**
+ * CODESYS compiler OPERATORS (implemented in the compiler, not in a library).
+ * IEC identifiers are case-insensitive, so ANY casing of these collides:
+ * found the hard way 2026-09-07 - a method input named 'sIn' parsed as the
+ * SIN operator and a local 'diV' as DIV, producing a 34-error cascade in
+ * SP21 P5. Library functions (LEN, MID, CONCAT, ...) are deliberately NOT
+ * listed: they are ordinary POUs that can be shadowed, not compiler tokens.
+ */
+const CODESYS_OPERATOR_KEYWORDS = new Set([
+  // Arithmetic
+  'ADD', 'SUB', 'MUL', 'DIV', 'MOVE', 'INDEXOF',
+  // Math
+  'SIN', 'COS', 'TAN', 'ASIN', 'ACOS', 'ATAN',
+  'EXP', 'EXPT', 'LN', 'LOG', 'SQRT', 'ABS', 'TRUNC',
+  // Bit shift
+  'SHL', 'SHR', 'ROL', 'ROR',
+  // Selection
+  'SEL', 'MAX', 'MIN', 'LIMIT', 'MUX',
+]);
+
+/**
  * Scan an IEC declarationCode block for VAR declarations whose variable
  * name collides with a reserved identifier. Returns one warning string
  * per offending name. Empty list if the input is empty/safe.
@@ -975,6 +995,14 @@ export function findReservedIecIdentifiers(declarationCode: string | undefined):
           `'${name}' is an IEC 61131-3 reserved keyword (keywords are case-insensitive: ` +
           `'by'/'By'/'BY' are all the FOR-loop step keyword) and cannot be a variable name. ` +
           `Rename it (e.g. '${name}Val', or a Hungarian-style prefix like 'st'/'fb'/'b'/'n').`
+        );
+      } else if (CODESYS_OPERATOR_KEYWORDS.has(name.toUpperCase())) {
+        seen.add(name);
+        warnings.push(
+          `'${name}' collides with the CODESYS compiler operator '${name.toUpperCase()}' ` +
+          `(IEC identifiers are case-insensitive: 'sIn' IS the SIN operator, 'diV' IS DIV). ` +
+          `Operators are compiler tokens and cannot be identifiers. ` +
+          `Rename it (e.g. '${name}Val', 'sText' instead of 'sIn').`
         );
       } else if (RESERVED_IEC_IDENTIFIERS.has(name)) {
         seen.add(name);
