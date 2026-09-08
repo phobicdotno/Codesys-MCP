@@ -230,26 +230,36 @@ try:
         except KeyboardInterrupt:
             _log("KeyboardInterrupt during system.delay() - ignored, watcher continues")
 
+    # Outer guard: a Cancel click can land between statements of the inner
+    # loop (inside an except handler, in _log, in os.listdir), where the
+    # per-iteration handler does not cover it. Re-enter the loop instead of
+    # letting the interrupt unwind the watcher.
     while True:
         try:
-            if _terminate_requested():
-                _log("Terminate signal received")
-                print("[WATCHER] Terminate signal received, exiting")
-                break
+            while True:
+                try:
+                    if _terminate_requested():
+                        _log("Terminate signal received")
+                        print("[WATCHER] Terminate signal received, exiting")
+                        break
 
-            cmd_files = sorted([
-                f for f in os.listdir(COMMANDS_DIR)
-                if f.endswith(".command.json")
-            ])
-            if cmd_files:
-                process_command(cmd_files[0])
+                    cmd_files = sorted([
+                        f for f in os.listdir(COMMANDS_DIR)
+                        if f.endswith(".command.json")
+                    ])
+                    if cmd_files:
+                        process_command(cmd_files[0])
+                except KeyboardInterrupt:
+                    _log("KeyboardInterrupt during loop iteration - ignored, watcher continues")
+                except Exception as e:
+                    _log("Loop error: %s\n%s" % (e, traceback.format_exc()))
+
+                # Yield: serves the message loop so the UI stays interactive.
+                _safe_delay(POLL_INTERVAL)
         except KeyboardInterrupt:
-            _log("KeyboardInterrupt during loop iteration - ignored, watcher continues")
-        except Exception as e:
-            _log("Loop error: %s\n%s" % (e, traceback.format_exc()))
-
-        # Yield: serves the message loop so the UI stays interactive.
-        _safe_delay(POLL_INTERVAL)
+            _log("KeyboardInterrupt outside the iteration guard - ignored, watcher continues")
+            continue
+        break
 
     _log("Watcher main loop exited")
 

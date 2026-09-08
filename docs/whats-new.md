@@ -5,7 +5,7 @@ Relative to upstream [luke-harriman/Codesys-MCP](https://github.com/luke-harrima
 ## Compatibility fixes (the headline)
 
 - **SP21+/SP22 compatibility.** The watcher was rewritten as single-threaded on the primary thread, yielding to the IDE via `system.delay()`. No background thread, no marshaling. Works on SP19, SP21, and SP22+. Full rationale in [migration-sp21-plus.md](migration-sp21-plus.md).
-- **Cancel-link hardening.** The watcher catches `KeyboardInterrupt` (which is not a subclass of `Exception` in IronPython 2.7) at three layers, so clicking *"Click here to CANCEL this operation"* in CODESYS no longer pops the modal traceback dialog or kills the watcher.
+- **Cancel-link hardening.** The watcher catches `KeyboardInterrupt` (which is not a subclass of `Exception` in IronPython 2.7) at three layers, so clicking *"Click here to CANCEL this operation"* in CODESYS no longer pops the modal traceback dialog or kills the watcher. v0.17.1 adds an outer guard around the whole poll loop: a Cancel that landed between the per-iteration handlers (inside `_log`, `os.listdir` or an `except` block) used to unwind the watcher with "KeyboardInterrupt outside main loop" and leave every later tool call timing out.
 
 ## Upstream tool fixes
 
@@ -28,6 +28,7 @@ Relative to upstream [luke-harriman/Codesys-MCP](https://github.com/luke-harrima
 - **Multi-device projects (v0.16.0)** - `list_applications` shows every application in a project with its device and which one is ACTIVE; `set_active_application` switches `project.active_application` and saves. 50 application-scoped tools take an optional `applicationPath` and activate it before acting; Task Configuration, Library Manager and Symbol Configuration are resolved under the active application first; `bump_project_version` maintains `_MCP_PROJECT_VERSION` in EVERY application so each PLC of a master/slave project carries the project version.
 - **Device network / access management** - `scan_network_devices`, `verify_device_reachable`, `rebind_device_to_scan_result`, `add_device_user`, `grant_object_access`, `restart_runtime_ssh`.
 - **Device tree ops** - `add_device` (child devices, idempotent), `update_device_type` (in-place retarget preserving the Application subtree).
+- **Struct device parameters (v0.17.1)** - `set_device_parameter` / `get_device_parameter` handle SP21 `ScriptCompoundDeviceParameter` values (a .NET list of child elements): the children are found by iteration or `Count` + indexer, so a struct such as the CC100 751-9402 channel mode (`AI Setup` id 2003161 / `AO Setup` id 2003178, element 0 = 100 0..10 V, 101 +-10 V, 120 0..20 mA, 121 4..20 mA, 122 3.6..21 mA; AO 200/201/202 V, 220/221/223 mA) is written with `elementIndex: 0`. `update_device_type` also works on channel objects, e.g. X6_1 `Single AI` -> `Single AO`.
 
 ## Reliability fixes
 

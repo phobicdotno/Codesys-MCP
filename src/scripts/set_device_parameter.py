@@ -30,6 +30,24 @@ def _sub_elements(param):
     don't accept a scalar write on .value -- their data lives in child value
     elements. The ScriptEngine surface for those children varies by SP, so
     probe the known shapes; [] means 'scalar parameter'."""
+    # SP21: a struct/array parameter is a ScriptCompoundDeviceParameter, a
+    # .NET list of child elements (Count + indexer + GetEnumerator) with
+    # has_sub_elements = True. Its own .value is the '{a, b}' text and
+    # rejects writes ("Operation not allowed on struct types"); the children
+    # take the scalar writes. Seen on the CC100 751-9402 'AI Setup' (s_AnalogMode.Mode).
+    try:
+        if getattr(param, 'has_sub_elements', False):
+            try:
+                lst = list(param)
+                if lst:
+                    return lst
+            except Exception:
+                pass
+            count = int(getattr(param, 'Count', 0) or 0)
+            if count:
+                return [param[i] for i in range(count)]
+    except Exception:
+        pass
     for attr in ('sub_elements', 'elements', 'data_elements'):
         try:
             subs = getattr(param, attr, None)
